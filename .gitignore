@@ -1,0 +1,29 @@
+# Compiled output
+/dist
+/node_modules
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+/coverage
+
+# Build tools
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
