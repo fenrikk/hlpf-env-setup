@@ -2,77 +2,99 @@
 - Name: Stukalov Nikita Oleksandrovich
 - Group: 232/1
 
-## Практичне заняття №2 — NestJS + PostgreSQL + Redis
+## Практичне заняття №3 — CRUD REST API для MiniShop
 
 > **Примітка:** Файл `.env` додано лише для навчальних цілей. У реальних проектах `.env` не повинен потрапляти до репозиторію.
 
-## Структура репозиторію
+### Структура репозиторію
 ```
 .
-├── src/              # NestJS source code
+├── src/
+│   ├── categories/
+│   │   ├── category.entity.ts
+│   │   ├── categories.module.ts
+│   │   ├── categories.service.ts
+│   │   └── categories.controller.ts
+│   ├── products/
+│   │   ├── product.entity.ts
+│   │   ├── products.module.ts
+│   │   ├── products.service.ts
+│   │   └── products.controller.ts
+│   ├── migrations/
+│   │   ├── 1700000001000-CreateTables.ts
+│   │   └── 1778106020472-AddIsActiveToProducts.ts
+│   ├── data-source.ts
+│   └── app.module.ts
 ├── Dockerfile
 ├── docker-compose.yml
-├── .env.example      # шаблон змінних оточення
+├── .env.example
 └── README.md
 ```
 
-## Запуск проекту
+### Запуск проекту
 ```bash
-cp .env.example .env   # налаштувати значення
+cp .env.example .env
 docker compose up --build
 ```
 
-## Перевірка сервісів
+### API Endpoints
+| Method | URL | Опис |
+|--------|-----|------|
+| GET | /api/categories | Список категорій |
+| GET | /api/categories/:id | Одна категорія |
+| POST | /api/categories | Створити категорію |
+| PATCH | /api/categories/:id | Оновити категорію |
+| DELETE | /api/categories/:id | Видалити категорію |
+| GET | /api/products | Список продуктів |
+| GET | /api/products/:id | Один продукт |
+| POST | /api/products | Створити продукт |
+| PATCH | /api/products/:id | Оновити продукт |
+| DELETE | /api/products/:id | Видалити продукт |
+
+### Перевірка міграцій
 ```text
-NAME                        IMAGE                COMMAND                  SERVICE    CREATED          STATUS                PORTS
-hlpf-env-setup-app-1        hlpf-env-setup-app   "docker-entrypoint.s…"   app        47 seconds ago   Up 46 seconds         0.0.0.0:3000->3000/tcp
-hlpf-env-setup-postgres-1   postgres:16-alpine   "docker-entrypoint.s…"   postgres   8 days ago       Up 8 days (healthy)   0.0.0.0:5432->5432/tcp
-hlpf-env-setup-redis-1      redis:7-alpine       "docker-entrypoint.s…"   redis      8 days ago       Up 8 days (healthy)   0.0.0.0:6379->6379/tcp
+$ docker compose exec postgres psql -U nestuser -d nestdb -c "\dt"
+
+           List of relations
+ Schema |    Name    | Type  |  Owner   
+--------+------------+-------+----------
+ public | categories | table | nestuser
+ public | migrations | table | nestuser
+ public | products   | table | nestuser
+(3 rows)
 ```
 
-## Перевірка PostgreSQL
+### Тест створення категорії
 ```text
-$ docker compose exec postgres psql -U nestuser -d nestdb -c '\l'
+$ curl -X POST http://localhost:3000/api/categories \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Electronics", "description": "Gadgets and devices"}'
 
-                                                      List of databases
-   Name    |  Owner   | Encoding | Locale Provider |  Collate   |   Ctype    | ICU Locale | ICU Rules |   Access privileges   
------------+----------+----------+-----------------+------------+------------+------------+------------+-----------------------
- nestdb    | nestuser | UTF8     | libc            | en_US.utf8 | en_US.utf8 |            |           | 
- postgres  | nestuser | UTF8     | libc            | en_US.utf8 | en_US.utf8 |            |           | 
- template0 | nestuser | UTF8     | libc            | en_US.utf8 | en_US.utf8 |            |           | =c/nestuser          +
-           |          |          |                 |            |            |            |           | nestuser=CTc/nestuser
- template1 | nestuser | UTF8     | libc            | en_US.utf8 | en_US.utf8 |            |           | =c/nestuser          +
-           |          |          |                 |            |            |            |           | nestuser=CTc/nestuser
-(4 rows)
+{"name":"Electronics","description":"Gadgets and devices","id":1,"createdAt":"2026-05-06T22:39:46.532Z"}
 ```
 
-## Перевірка Redis
+### Тест створення продукту
 ```text
-$ docker compose exec redis redis-cli ping
-PONG
+$ curl -X POST http://localhost:3000/api/products \
+  -H "Content-Type: application/json" \
+  -d '{"name": "iPhone 15", "price": 999.99, "stock": 50, "categoryId": 1}'
+
+{"name":"iPhone 15","price":999.99,"stock":50,"category":{"id":1},"description":null,"id":1,"isActive":true,"createdAt":"2026-05-06T22:39:53.799Z","updatedAt":"2026-05-06T22:39:53.799Z"}
 ```
 
-## Перевірка застосунку
+### Тест отримання продуктів
 ```text
-$ curl http://localhost:3000
-Hello World!
+$ curl http://localhost:3000/api/products
+
+[
+  {"id":1,"name":"iPhone 15","description":null,"price":"999.99","stock":50,"isActive":true,"createdAt":"2026-05-06T22:39:53.799Z","updatedAt":"2026-05-06T22:39:53.799Z","category":{"id":1,"name":"Electronics","description":"Gadgets and devices","createdAt":"2026-05-06T22:39:46.532Z"}},
+  {"id":2,"name":"USB Cable","description":null,"price":"9.99","stock":200,"isActive":true,"createdAt":"2026-05-06T22:39:53.815Z","updatedAt":"2026-05-06T22:39:53.815Z","category":null}
+]
 ```
 
-## Логи NestJS (фрагмент)
+### Тест 404
 ```text
-app-1  | > hlpf-env-setup@0.0.1 start:dev
-app-1  | > nest start --watch
-app-1  |
-app-1  | [7:58:38 PM] Found 0 errors. Watching for file changes.
-app-1  |
-app-1  | [Nest] LOG [NestFactory] Starting Nest application...
-app-1  | [Nest] LOG [InstanceLoader] TypeOrmModule dependencies initialized
-app-1  | [Nest] LOG [InstanceLoader] ConfigHostModule dependencies initialized
-app-1  | [Nest] LOG [InstanceLoader] AppModule dependencies initialized
-app-1  | [Nest] LOG [InstanceLoader] ConfigModule dependencies initialized
-app-1  | [Nest] LOG [InstanceLoader] CacheModule dependencies initialized
-app-1  | [Nest] LOG [InstanceLoader] TypeOrmCoreModule dependencies initialized
-app-1  | [Nest] LOG [RoutesResolver] AppController {/}:
-app-1  | [Nest] LOG [RouterExplorer] Mapped {/, GET} route
-app-1  | [Nest] LOG [NestApplication] Nest application successfully started
+$ curl http://localhost:3000/api/products/999
+
+{"message":"Product #999 not found","error":"Not Found","statusCode":404}
 ```
