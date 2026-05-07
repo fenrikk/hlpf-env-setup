@@ -2,7 +2,7 @@
 - Name: Stukalov Nikita Oleksandrovich
 - Group: 232/1
 
-## Практичне заняття №3 — CRUD REST API для MiniShop
+## Практичне заняття №4 — DTO + class-validator + Pipes
 
 > **Примітка:** Файл `.env` додано лише для навчальних цілей. У реальних проектах `.env` не повинен потрапляти до репозиторію.
 
@@ -11,23 +11,30 @@
 .
 ├── src/
 │   ├── categories/
+│   │   ├── dto/
+│   │   │   ├── create-category.dto.ts
+│   │   │   └── update-category.dto.ts
 │   │   ├── category.entity.ts
 │   │   ├── categories.module.ts
 │   │   ├── categories.service.ts
 │   │   └── categories.controller.ts
 │   ├── products/
+│   │   ├── dto/
+│   │   │   ├── create-product.dto.ts
+│   │   │   └── update-product.dto.ts
 │   │   ├── product.entity.ts
 │   │   ├── products.module.ts
 │   │   ├── products.service.ts
 │   │   └── products.controller.ts
+│   ├── common/
+│   │   └── pipes/
+│   │       └── trim.pipe.ts
 │   ├── migrations/
-│   │   ├── 1700000001000-CreateTables.ts
-│   │   └── 1778106020472-AddIsActiveToProducts.ts
 │   ├── data-source.ts
+│   ├── main.ts
 │   └── app.module.ts
 ├── Dockerfile
 ├── docker-compose.yml
-├── .env.example
 └── README.md
 ```
 
@@ -37,64 +44,56 @@ cp .env.example .env
 docker compose up --build
 ```
 
-### API Endpoints
-| Method | URL | Опис |
-|--------|-----|------|
-| GET | /api/categories | Список категорій |
-| GET | /api/categories/:id | Одна категорія |
-| POST | /api/categories | Створити категорію |
-| PATCH | /api/categories/:id | Оновити категорію |
-| DELETE | /api/categories/:id | Видалити категорію |
-| GET | /api/products | Список продуктів |
-| GET | /api/products/:id | Один продукт |
-| POST | /api/products | Створити продукт |
-| PATCH | /api/products/:id | Оновити продукт |
-| DELETE | /api/products/:id | Видалити продукт |
-
-### Перевірка міграцій
-```text
-$ docker compose exec postgres psql -U nestuser -d nestdb -c "\dt"
-
-           List of relations
- Schema |    Name    | Type  |  Owner   
---------+------------+-------+----------
- public | categories | table | nestuser
- public | migrations | table | nestuser
- public | products   | table | nestuser
-(3 rows)
-```
-
-### Тест створення категорії
+### Тест валідації — порожнє ім'я категорії
 ```text
 $ curl -X POST http://localhost:3000/api/categories \
   -H "Content-Type: application/json" \
-  -d '{"name": "Electronics", "description": "Gadgets and devices"}'
+  -d '{"name": ""}'
 
-{"name":"Electronics","description":"Gadgets and devices","id":1,"createdAt":"2026-05-06T22:39:46.532Z"}
+{"message":["name must be longer than or equal to 2 characters"],"error":"Bad Request","statusCode":400}
 ```
 
-### Тест створення продукту
+### Тест валідації — від'ємна ціна продукту
 ```text
 $ curl -X POST http://localhost:3000/api/products \
   -H "Content-Type: application/json" \
-  -d '{"name": "iPhone 15", "price": 999.99, "stock": 50, "categoryId": 1}'
+  -d '{"name": "Bad Product", "price": -5}'
 
-{"name":"iPhone 15","price":999.99,"stock":50,"category":{"id":1},"description":null,"id":1,"isActive":true,"createdAt":"2026-05-06T22:39:53.799Z","updatedAt":"2026-05-06T22:39:53.799Z"}
+{"message":["price must not be less than 0.01"],"error":"Bad Request","statusCode":400}
 ```
 
-### Тест отримання продуктів
+### Тест валідації — зайве поле
 ```text
-$ curl http://localhost:3000/api/products
+$ curl -X POST http://localhost:3000/api/categories \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test", "isAdmin": true}'
 
-[
-  {"id":1,"name":"iPhone 15","description":null,"price":"999.99","stock":50,"isActive":true,"createdAt":"2026-05-06T22:39:53.799Z","updatedAt":"2026-05-06T22:39:53.799Z","category":{"id":1,"name":"Electronics","description":"Gadgets and devices","createdAt":"2026-05-06T22:39:46.532Z"}},
-  {"id":2,"name":"USB Cable","description":null,"price":"9.99","stock":200,"isActive":true,"createdAt":"2026-05-06T22:39:53.815Z","updatedAt":"2026-05-06T22:39:53.815Z","category":null}
-]
+{"message":["property isAdmin should not exist"],"error":"Bad Request","statusCode":400}
 ```
 
-### Тест 404
+### Тест TrimPipe
 ```text
-$ curl http://localhost:3000/api/products/999
+$ curl -X POST http://localhost:3000/api/categories \
+  -H "Content-Type: application/json" \
+  -d '{"name": "  Home Appliances  "}'
 
-{"message":"Product #999 not found","error":"Not Found","statusCode":404}
+{"name":"Home Appliances","description":null,"id":4,"createdAt":"2026-05-07T06:53:04.153Z"}
+```
+
+### Тест валідне створення продукту
+```text
+$ curl -X POST http://localhost:3000/api/products \
+  -H "Content-Type: application/json" \
+  -d '{"name": "iPhone 16", "price": 1099.99, "stock": 30, "categoryId": 1}'
+
+{"name":"iPhone 16","price":1099.99,"stock":30,"category":{"id":1},"description":null,"id":3,"isActive":true,"createdAt":"2026-05-07T06:53:11.322Z","updatedAt":"2026-05-07T06:53:11.322Z"}
+```
+
+### Тест кількох помилок одразу
+```text
+$ curl -X POST http://localhost:3000/api/products \
+  -H "Content-Type: application/json" \
+  -d '{"name": "", "price": -5, "stock": -10}'
+
+{"message":["name must be longer than or equal to 2 characters","price must not be less than 0.01","stock must not be less than 0"],"error":"Bad Request","statusCode":400}
 ```
