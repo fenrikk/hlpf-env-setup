@@ -6,11 +6,16 @@ import { redisStore } from 'cache-manager-redis-yet';
 
 import { Category } from './categories/category.entity';
 import { Product } from './products/product.entity';
+import { User } from './users/user.entity';
+
 import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 
 import { CreateTables1700000001000 } from './migrations/1700000001000-CreateTables';
 import { AddIsActiveToProducts1778106020472 } from './migrations/1778106020472-AddIsActiveToProducts';
+import { CreateUsers1778450964950 } from './migrations/1778450964950-CreateUsers';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -26,12 +31,13 @@ import { AppService } from './app.service';
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      entities: [Category, Product],
+      entities: [Category, Product, User],
       synchronize: false,
       migrationsRun: true,
       migrations: [
         CreateTables1700000001000,
         AddIsActiveToProducts1778106020472,
+        CreateUsers1778450964950,
       ],
     }),
 
@@ -50,6 +56,8 @@ import { AppService } from './app.service';
 
     CategoriesModule,
     ProductsModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
