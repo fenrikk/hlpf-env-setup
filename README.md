@@ -1,26 +1,17 @@
 ## Student
-- Name: Stukalov Nikita Oleksandrovich
-- Group: 232/1
+- Name: Stukalov Nikita
+- Group: IM-32
 
-## Практичне заняття №5 — JWT Authentication + Guards + RBAC
-
-> **Примітка:** Файл `.env` додано лише для навчальних цілей. У реальних проектах `.env` не повинен потрапляти до репозиторію.
+## Практичне заняття №6 — Interceptors + Exception Filters + Swagger
 
 ### Структура репозиторію
 ```
 .
 ├── src/
-│   ├── auth/
-│   │   ├── dto/
-│   │   │   ├── register.dto.ts
-│   │   │   └── login.dto.ts
-│   │   ├── auth.module.ts
-│   │   ├── auth.service.ts
-│   │   └── auth.controller.ts
-│   ├── users/
-│   │   ├── user.entity.ts
-│   │   ├── users.module.ts
-│   │   └── users.service.ts
+│   ├── auth/ ...
+│   ├── users/ ...
+│   ├── categories/ ...
+│   ├── products/ ...
 │   ├── common/
 │   │   ├── enums/
 │   │   │   └── role.enum.ts
@@ -30,14 +21,17 @@
 │   │   ├── decorators/
 │   │   │   ├── current-user.decorator.ts
 │   │   │   └── roles.decorator.ts
+│   │   ├── interceptors/
+│   │   │   ├── logging.interceptor.ts
+│   │   │   └── transform.interceptor.ts
+│   │   ├── filters/
+│   │   │   └── http-exception.filter.ts
 │   │   └── pipes/
 │   │       └── trim.pipe.ts
-│   ├── categories/ ...
-│   ├── products/ ...
 │   ├── migrations/
-│   ├── data-source.ts
 │   ├── main.ts
 │   └── app.module.ts
+├── swagger-screenshot.png
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md
@@ -49,63 +43,41 @@ cp .env.example .env
 docker compose up --build
 ```
 
-### API Endpoints
-| Method | URL | Auth | Role |
-|--------|-----|------|------|
-| POST | /auth/register | - | - |
-| POST | /auth/login | - | - |
-| GET | /api/categories | - | - |
-| POST | /api/categories | JWT | admin |
-| PATCH | /api/categories/:id | JWT | admin |
-| DELETE | /api/categories/:id | JWT | admin |
-| GET | /api/products | - | - |
-| POST | /api/products | JWT | admin |
-| PATCH | /api/products/:id | JWT | admin |
-| DELETE | /api/products/:id | JWT | admin |
+### Swagger UI
+http://localhost:3000/api/docs
 
-### Тест реєстрації
-```text
-$ curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@test.com", "password": "password123", "name": "Admin"}'
+![Swagger](swagger-screenshot.png)
 
-{"email":"admin@test.com","name":"Admin","id":1,"role":"user","createdAt":"2026-05-10T22:15:45.015Z"}
+### Формат успішної відповіді
+```json
+{
+  "data": { "..." : "..." },
+  "statusCode": 200,
+  "timestamp": "2026-05-10T22:25:53.000Z"
+}
 ```
 
-### Тест логіну
-```text
-$ curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@test.com", "password": "password123"}'
-
-{"accessToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AdGVzdC5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3Nzg0NTEzNjMsImV4cCI6MTc3ODQ1NDk2M30.6TeHJgVdcfHo4Bira0pPYx3Qu6hf6esflaebdVsHKhA"}
+### Формат помилки
+```json
+{
+  "error": {
+    "code": 400,
+    "message": "Validation failed",
+    "details": ["name must be longer than or equal to 2 characters"],
+    "traceId": "a1b2c3d4-e5f6-..."
+  },
+  "timestamp": "2026-05-10T22:25:35.000Z"
+}
 ```
 
-### Тест 401 — запит без токена
+### Приклад логів (LoggingInterceptor)
 ```text
-$ curl -X POST http://localhost:3000/api/products \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Hacked Product", "price": 1}'
-
-{"message":"Missing authorization token","error":"Unauthorized","statusCode":401}
+[Nest] 29  - 05/10/2026, 10:25:45 PM   ERROR [Exception] [ce922842-bc95-4fcf-8a79-6a1b06c49589] POST /api/categories — 401 — Missing authorization token
+[Nest] 29  - 05/10/2026, 10:25:53 PM     LOG [HTTP] GET /api/products — 200 — 13ms
 ```
 
-### Тест 403 — запит з роллю user
+### Тест помилки з traceId
 ```text
-$ curl -X POST http://localhost:3000/api/products \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <USER_TOKEN>" \
-  -d '{"name": "Blocked Product", "price": 99}'
-
-{"message":"Insufficient permissions","error":"Forbidden","statusCode":403}
-```
-
-### Тест успішного створення від admin
-```text
-$ curl -X POST http://localhost:3000/api/products \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ADMIN_TOKEN>" \
-  -d '{"name": "MacBook Pro", "price": 2499.99, "stock": 10}'
-
-{"name":"MacBook Pro","price":2499.99,"stock":10,"description":null,"id":4,"isActive":true,"createdAt":"2026-05-10T22:15:59.801Z","updatedAt":"2026-05-10T22:15:59.801Z"}
+$ curl http://localhost:3000/api/products/999
+{"error":{"code":404,"message":"Product #999 not found","traceId":"1614b7c9-658c-4a84-9d66-060c1394935b"},"timestamp":"2026-05-10T22:26:00.502Z"}
 ```
