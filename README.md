@@ -2,7 +2,7 @@
 - Name: Stukalov Nikita Oleksandrovich
 - Group: 232/1
 
-## Практичне заняття №4 — DTO + class-validator + Pipes
+## Практичне заняття №5 — JWT Authentication + Guards + RBAC
 
 > **Примітка:** Файл `.env` додано лише для навчальних цілей. У реальних проектах `.env` не повинен потрапляти до репозиторію.
 
@@ -10,25 +10,30 @@
 ```
 .
 ├── src/
-│   ├── categories/
+│   ├── auth/
 │   │   ├── dto/
-│   │   │   ├── create-category.dto.ts
-│   │   │   └── update-category.dto.ts
-│   │   ├── category.entity.ts
-│   │   ├── categories.module.ts
-│   │   ├── categories.service.ts
-│   │   └── categories.controller.ts
-│   ├── products/
-│   │   ├── dto/
-│   │   │   ├── create-product.dto.ts
-│   │   │   └── update-product.dto.ts
-│   │   ├── product.entity.ts
-│   │   ├── products.module.ts
-│   │   ├── products.service.ts
-│   │   └── products.controller.ts
+│   │   │   ├── register.dto.ts
+│   │   │   └── login.dto.ts
+│   │   ├── auth.module.ts
+│   │   ├── auth.service.ts
+│   │   └── auth.controller.ts
+│   ├── users/
+│   │   ├── user.entity.ts
+│   │   ├── users.module.ts
+│   │   └── users.service.ts
 │   ├── common/
+│   │   ├── enums/
+│   │   │   └── role.enum.ts
+│   │   ├── guards/
+│   │   │   ├── jwt-auth.guard.ts
+│   │   │   └── roles.guard.ts
+│   │   ├── decorators/
+│   │   │   ├── current-user.decorator.ts
+│   │   │   └── roles.decorator.ts
 │   │   └── pipes/
 │   │       └── trim.pipe.ts
+│   ├── categories/ ...
+│   ├── products/ ...
 │   ├── migrations/
 │   ├── data-source.ts
 │   ├── main.ts
@@ -44,56 +49,63 @@ cp .env.example .env
 docker compose up --build
 ```
 
-### Тест валідації — порожнє ім'я категорії
-```text
-$ curl -X POST http://localhost:3000/api/categories \
-  -H "Content-Type: application/json" \
-  -d '{"name": ""}'
+### API Endpoints
+| Method | URL | Auth | Role |
+|--------|-----|------|------|
+| POST | /auth/register | - | - |
+| POST | /auth/login | - | - |
+| GET | /api/categories | - | - |
+| POST | /api/categories | JWT | admin |
+| PATCH | /api/categories/:id | JWT | admin |
+| DELETE | /api/categories/:id | JWT | admin |
+| GET | /api/products | - | - |
+| POST | /api/products | JWT | admin |
+| PATCH | /api/products/:id | JWT | admin |
+| DELETE | /api/products/:id | JWT | admin |
 
-{"message":["name must be longer than or equal to 2 characters"],"error":"Bad Request","statusCode":400}
+### Тест реєстрації
+```text
+$ curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@test.com", "password": "password123", "name": "Admin"}'
+
+{"email":"admin@test.com","name":"Admin","id":1,"role":"user","createdAt":"2026-05-10T22:15:45.015Z"}
 ```
 
-### Тест валідації — від'ємна ціна продукту
+### Тест логіну
+```text
+$ curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@test.com", "password": "password123"}'
+
+{"accessToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AdGVzdC5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3Nzg0NTEzNjMsImV4cCI6MTc3ODQ1NDk2M30.6TeHJgVdcfHo4Bira0pPYx3Qu6hf6esflaebdVsHKhA"}
+```
+
+### Тест 401 — запит без токена
 ```text
 $ curl -X POST http://localhost:3000/api/products \
   -H "Content-Type: application/json" \
-  -d '{"name": "Bad Product", "price": -5}'
+  -d '{"name": "Hacked Product", "price": 1}'
 
-{"message":["price must not be less than 0.01"],"error":"Bad Request","statusCode":400}
+{"message":"Missing authorization token","error":"Unauthorized","statusCode":401}
 ```
 
-### Тест валідації — зайве поле
-```text
-$ curl -X POST http://localhost:3000/api/categories \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Test", "isAdmin": true}'
-
-{"message":["property isAdmin should not exist"],"error":"Bad Request","statusCode":400}
-```
-
-### Тест TrimPipe
-```text
-$ curl -X POST http://localhost:3000/api/categories \
-  -H "Content-Type: application/json" \
-  -d '{"name": "  Home Appliances  "}'
-
-{"name":"Home Appliances","description":null,"id":4,"createdAt":"2026-05-07T06:53:04.153Z"}
-```
-
-### Тест валідне створення продукту
+### Тест 403 — запит з роллю user
 ```text
 $ curl -X POST http://localhost:3000/api/products \
   -H "Content-Type: application/json" \
-  -d '{"name": "iPhone 16", "price": 1099.99, "stock": 30, "categoryId": 1}'
+  -H "Authorization: Bearer <USER_TOKEN>" \
+  -d '{"name": "Blocked Product", "price": 99}'
 
-{"name":"iPhone 16","price":1099.99,"stock":30,"category":{"id":1},"description":null,"id":3,"isActive":true,"createdAt":"2026-05-07T06:53:11.322Z","updatedAt":"2026-05-07T06:53:11.322Z"}
+{"message":"Insufficient permissions","error":"Forbidden","statusCode":403}
 ```
 
-### Тест кількох помилок одразу
+### Тест успішного створення від admin
 ```text
 $ curl -X POST http://localhost:3000/api/products \
   -H "Content-Type: application/json" \
-  -d '{"name": "", "price": -5, "stock": -10}'
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -d '{"name": "MacBook Pro", "price": 2499.99, "stock": 10}'
 
-{"message":["name must be longer than or equal to 2 characters","price must not be less than 0.01","stock must not be less than 0"],"error":"Bad Request","statusCode":400}
+{"name":"MacBook Pro","price":2499.99,"stock":10,"description":null,"id":4,"isActive":true,"createdAt":"2026-05-10T22:15:59.801Z","updatedAt":"2026-05-10T22:15:59.801Z"}
 ```
